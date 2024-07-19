@@ -1,0 +1,23 @@
+[package]
+name = "poke-duck"
+version = "0.0.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "2.0.0-beta", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0-beta", features = [] }
+tauri-plugin-shell = "2.0.0-beta"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1.10.5"
+tokio = { version = "1.38.0", features = ["full"] }
+dirs = "5.0.1"
+anyhow = "1.0.86"
+anyhow-tauri = "1.0.0"
+thiserror = "1.0.62"
