@@ -12,8 +12,8 @@ export interface IProjectInfo {
   id?: string;
   projectName: string;
   projectPath: string;
-  editor_exec_path: string;
-  terminal_exec_path: string;
+  editorExecPath: string;
+  terminalExecPath: string;
 }
 
 
@@ -21,7 +21,7 @@ interface Application {
   name: string;
   path: string,
   icon: string,
-  execute_path: string,
+  executeName: string,
 }
 
 interface Applications {
@@ -64,7 +64,7 @@ export default function ProjectInfo(props: ProjectInfoProps) {
           invoke<Application[]>("get_editor_applications")
         ])
         const [terminals, editors] = results
-        console.log(terminals, editors)
+        // console.log(terminals, editors)
         setApplications({
           terminals,
           editors
@@ -108,14 +108,14 @@ export default function ProjectInfo(props: ProjectInfoProps) {
       <FormItem label="项目地址" name="projectPath" required validateTrigger="onBlur" rules={[{ required: true, message: "请输入项目地址" }, { validator: validateProjectPath }]}>
         <Input />
       </FormItem>
-      <FormItem label="编辑器" name="editor_exec_path" required rules={[{ required: true, message: "请选择编辑器" }]}>
+      <FormItem label="编辑器" name="editorExecPath" required rules={[{ required: true, message: "请选择编辑器" }]}>
         <Select
-          options={applications.editors.map(item => ({ label: item.name, value: item.execute_path }))}
+          options={applications.editors.map(item => ({ label: item.name, value: item.executeName }))}
         />
       </FormItem>
-      <FormItem label="终端工具" name="terminal_exec_path" required rules={[{ required: true, message: "请选择终端工具" }]}>
+      <FormItem label="终端工具" name="terminalExecPath" required rules={[{ required: true, message: "请选择终端工具" }]}>
         <Select
-          options={applications.terminals.map(item => ({ label: item.name, value: item.execute_path }))}
+          options={applications.terminals.map(item => ({ label: item.name, value: item.executeName }))}
         />
       </FormItem>
     </Modal>

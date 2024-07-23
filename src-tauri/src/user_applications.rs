@@ -2,11 +2,13 @@ use serde::Serialize;
 
 // --------------- app start ---------------
 #[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Application {
     name: String,
     path: String,
     icon: String,
-    execute_path: String,
+    #[serde(rename = "executeName")]
+    execute_name: String,
 }
 
 pub async fn get_applications_by_names(name_list: Vec<&str>) -> anyhow::Result<Vec<Application>> {
@@ -22,8 +24,6 @@ pub async fn get_applications_by_names(name_list: Vec<&str>) -> anyhow::Result<V
 
     Ok(target_applications)
 }
-// 通过 get_applications 获取到的是应用程序的根目录，即 /Applications/XXXX.app，执行应用程序的路径需要在后面 添加上 /Contents/MacOS/XXXX
-// /Applications/NeteaseMusic.app/Contents/MacOS/NeteaseMusic
 
 pub async fn get_applications() -> anyhow::Result<Vec<Application>> {
     let results = get_applications_dirs().await?;
@@ -83,11 +83,20 @@ fn transform_app_dir_to_application(app_dir: &String) -> anyhow::Result<Applicat
         .replace(".app", "");
     // let icon = format!("{}/Contents/Resources/AppIcon.icns", app_dir);
 
+    // 从 Contents/Info.plist 文件中获取应用程序
+    // let info_plist_path = format!("{}/Contents/Info.plist", app_dir);
+    // let info_plist = plist::Value::from_file(info_plist_path)?;
+    // let execute_name = info_plist
+    //     .as_dictionary()
+    //     .and_then(|dict| dict.get("CFBundleName"))
+    //     .and_then(|value| value.as_string())
+    //     .unwrap_or(&app_name);
+
     Ok(Application {
         name: app_name.clone(),
         path: app_dir.clone(),
         icon: "".to_string(),
-        execute_path: format!("{}/Contents/MacOS/{}", app_dir, app_name),
+        execute_name: app_name.clone(),
     })
 }
 

@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::process::Command;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use user_applications::{get_applications_by_names, Application};
 
 mod user_applications;
@@ -14,9 +14,14 @@ fn validate_project_path(project_path: &str) -> anyhow_tauri::TAResult<bool> {
 }
 
 #[tauri::command]
-fn open_vscode(path: &str) {
-    let _ = Command::new("code").arg(path).spawn();
-    println!("Opening VSCode at {}", path);
+fn run_command(command: &str, args: Vec<String>) -> anyhow_tauri::TAResult<()> {
+    let mut cmd = Command::new("open");
+    cmd.arg("-a");
+    cmd.arg(command);
+    cmd.args(args);
+    println!("{:?}", cmd);
+    let _ = cmd.spawn();
+    Ok(())
 }
 
 const TERMINALS: [&str; 4] = ["Terminal", "iTerm", "Hyper", "Warp"];
@@ -35,24 +40,106 @@ async fn get_editor_applications() -> anyhow_tauri::TAResult<Vec<Application>> {
     Ok(applications)
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ProjectInfo {
     id: String,
     #[serde(rename = "projectName")]
     project_name: String,
     #[serde(rename = "projectPath")]
     project_path: String,
+    #[serde(rename = "editorExecPath")]
     editor_exec_path: String,
+    #[serde(rename = "terminalExecPath")]
     terminal_exec_path: String,
+}
+
+const DEFAULT_HOME_DIR: &str = "/Users";
+const POKE_DUCK_DIR: &str = ".poke-duck";
+const PROJECTS_FILE: &str = "projects.json";
+
+pub fn get_home_dir() -> std::path::PathBuf {
+    dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(DEFAULT_HOME_DIR))
+}
+
+pub fn get_poke_duck_dir() -> std::path::PathBuf {
+    get_home_dir().join(POKE_DUCK_DIR)
+}
+
+fn project_file_ready() -> anyhow::Result<()> {
+    // 判断 home_dir/.poke-duck/projects.json 文件是否存在，这里的问题是，.poke-duck 文件夹可能都不存在
+    let poke_duck_dir = get_poke_duck_dir();
+
+    if !poke_duck_dir.exists() {
+        std::fs::create_dir(&poke_duck_dir)?;
+    }
+
+    let projects_file = poke_duck_dir.join(PROJECTS_FILE);
+    if !projects_file.exists() {
+        std::fs::write(&projects_file, "[]")?;
+    }
+    Ok(())
+}
+
+fn read_projects() -> anyhow::Result<Vec<ProjectInfo>> {
+    project_file_ready()?;
+
+    let projects_file = get_poke_duck_dir().join(PROJECTS_FILE);
+    let content = std::fs::read_to_string(&projects_file)?;
+    let projects: Vec<ProjectInfo> = serde_json::from_str(&content)?;
+    Ok(projects)
+}
+
+fn write_projects(projects: Vec<ProjectInfo>) -> anyhow::Result<()> {
+    let projects_file = get_poke_duck_dir().join(PROJECTS_FILE);
+    let content = serde_json::to_string(&projects)?;
+    std::fs::write(&projects_file, content)?;
+    Ok(())
 }
 
 #[tauri::command]
 async fn add_project(project_info: ProjectInfo) -> anyhow_tauri::TAResult<()> {
-    // 将这条数据存储到 home_dir/.poke-duck/projects.json 中
-    // 这里需要先读取文件，然后将新的数据添加到文件中
-    // 但是文件可能不存在，所以需要先判断文件是否存在，如果不存在则创建文件
-    // 如果文件存在，则读取文件内容，然后将新的数据添加到文件中
-    unimplemented!()
+    let mut projects = read_projects()?;
+    projects.push(project_info);
+    write_projects(projects)?;
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ProjectData {
+    data: Vec<ProjectInfo>,
+    total: usize,
+    current: usize,
+    page_size: usize,
+}
+
+#[tauri::command]
+fn get_projects() -> anyhow_tauri::TAResult<ProjectData> {
+    let projects = read_projects()?;
+    let project_data = ProjectData {
+        current: 0,
+        total: projects.len(),
+        page_size: projects.len(),
+        data: projects,
+    };
+    Ok(project_data)
+}
+
+#[tauri::command]
+fn remove_projects(ids: Vec<String>) -> anyhow_tauri::TAResult<()> {
+    let mut projects = read_projects()?;
+    projects.retain(|project| !ids.contains(&project.id));
+    write_projects(projects)?;
+    Ok(())
+}
+
+#[tauri::command]
+fn clear_data() -> anyhow_tauri::TAResult<()> {
+    let poke_duck_dir = get_poke_duck_dir();
+    if poke_duck_dir.exists() {
+        let _ = std::fs::remove_dir_all(&poke_duck_dir);
+    }
+    Ok(())
 }
 
 fn main() {
@@ -60,10 +147,13 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             validate_project_path,
-            open_vscode,
+            run_command,
             get_terminal_applications,
             get_editor_applications,
             add_project,
+            get_projects,
+            remove_projects,
+            clear_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

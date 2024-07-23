@@ -2239,6 +2239,7 @@ dependencies = [
  "anyhow",
  "anyhow-tauri",
  "dirs",
+ "plist",
  "regex",
  "serde",
  "serde_json",
