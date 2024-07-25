@@ -6,6 +6,7 @@ const { Item: FormItem } = Form
 
 type ProjectInfoProps = Omit<ModalProps, 'onOk'> & {
   initialValues?: IProjectInfo;
+  disabled?: boolean;
   onOk: (values: IProjectInfo) => void;
 }
 
@@ -41,6 +42,7 @@ export default function ProjectInfo(props: ProjectInfoProps) {
       terminal: "",
       startCommand: "pnpm install"
     },
+    disabled,
     onOk,
     ...restProps
   } = props
@@ -108,6 +110,7 @@ export default function ProjectInfo(props: ProjectInfoProps) {
           layout="horizontal"
           name="form_in_modal"
           form={form}
+          disabled={disabled}
           labelCol={{ span: 5 }}
           wrapperCol={{ span: 16 }}
           clearOnDestroy

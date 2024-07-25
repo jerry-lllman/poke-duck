@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import { Button, Flex } from "antd";
+import { Button, Flex, Popconfirm, Space } from "antd";
 import { useMount, useSetState } from "ahooks";
 import ProjectInfo, { IProjectInfo } from "./ProjectInfo";
 import { nanoid } from "nanoid";
@@ -13,7 +13,7 @@ interface IProjectData {
   total: number;
   current: number;
   pageSize: number;
-  data: IProjectInfo[];
+  data: Required<IProjectInfo>[];
 
 }
 
@@ -53,6 +53,8 @@ function App() {
   }
 
   const updateProject = async (values: IProjectInfo) => {
+    // TODO 优化
+    if (disabled) return
     await invoke('update_project', { projectInfo: { ...values, id: currentProjectId } })
     onCancel()
     getProjectData()
@@ -68,7 +70,16 @@ function App() {
     getProjectData()
   }
 
+  // TODO: currentProjectId disabled visible 三个状态可以合并成一个状态
   const [currentProjectId, setCurrentProjectId] = useState<string>()
+  const [disabled, setDisabled] = useState(false)
+
+  const viewProject = (id: string) => {
+    setCurrentProjectId(id)
+    setVisible(true)
+    setDisabled(true)
+  }
+
   const editProject = (id: string) => {
     setCurrentProjectId(id)
     setVisible(true)
@@ -79,20 +90,27 @@ function App() {
   }, [currentProjectId, projectData.data])
 
   return (
-    <div>
+    <div className="m-2">
       <Flex className="mb-5" justify="flex-end">
-        <Button onClick={openAddProjectModal}>添加项目</Button>
-        <Button onClick={clearData} >清除数据</Button>
+        <Space>
+          <Button onClick={openAddProjectModal}>添加项目</Button>
+          <Popconfirm title="清除所有数据" onConfirm={clearData}>
+            <Button danger>清除数据</Button>
+          </Popconfirm>
+        </Space>
       </Flex>
+      {/* 单独路由页面 */}
       <ProjectInfo
         initialValues={currentProject}
         open={visible}
+        disabled={disabled}
         onOk={currentProjectId ? updateProject : addProject}
         onCancel={onCancel}
       />
       <ProjectList
         dataSource={projectData.data}
         getDataSource={getProjectData}
+        viewProject={viewProject}
         editProject={editProject}
       />
     </div>
