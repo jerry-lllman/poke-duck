@@ -1,10 +1,11 @@
 import { Form, Input, Modal, ModalProps, Select, notification } from "antd";
 import { invoke } from "@tauri-apps/api/core";
-import { useMount, useSetState } from "ahooks";
+import { useMount, useSetState, useUpdateEffect } from "ahooks";
 
 const { Item: FormItem } = Form
 
 type ProjectInfoProps = Omit<ModalProps, 'onOk'> & {
+  initialValues?: IProjectInfo;
   onOk: (values: IProjectInfo) => void;
 }
 
@@ -12,8 +13,9 @@ export interface IProjectInfo {
   id?: string;
   projectName: string;
   projectPath: string;
-  editorExecPath: string;
-  terminalExecPath: string;
+  editor: string;
+  terminal: string;
+  startCommand?: string;
 }
 
 
@@ -31,8 +33,23 @@ interface Applications {
 }
 
 export default function ProjectInfo(props: ProjectInfoProps) {
-  const [form] = Form.useForm();
-  const { onOk, ...restProps } = props
+  const {
+    initialValues = {
+      projectName: "",
+      projectPath: "",
+      editor: "",
+      terminal: "",
+      startCommand: "pnpm install"
+    },
+    onOk,
+    ...restProps
+  } = props
+
+  const [form] = Form.useForm<IProjectInfo>();
+
+  useUpdateEffect(() => {
+    if (props.open && initialValues) form.setFieldsValue(initialValues)
+  }, [props.open, initialValues])
 
   const validateProjectPath = async (_: any, value: string) => {
     if (!value) {
@@ -84,17 +101,17 @@ export default function ProjectInfo(props: ProjectInfoProps) {
     <Modal
       title="添加项目"
       destroyOnClose
+      forceRender
       okButtonProps={{ autoFocus: true, htmlType: 'submit' }}
       modalRender={(dom) => (
         <Form
-          layout="vertical"
+          layout="horizontal"
           name="form_in_modal"
           form={form}
+          labelCol={{ span: 5 }}
+          wrapperCol={{ span: 16 }}
           clearOnDestroy
-          initialValues={{
-            projectName: "",
-            projectPath: ""
-          }}
+          initialValues={initialValues}
           onFinish={onOk}
         >
           {dom}
@@ -102,21 +119,49 @@ export default function ProjectInfo(props: ProjectInfoProps) {
       )}
       {...restProps}
     >
-      <FormItem name="projectName" label="项目名称" required rules={[{ required: true, message: "请输入项目名称" }]} >
+      <FormItem
+        required
+        name="projectName"
+        label="项目名称"
+        rules={[{ required: true, message: "请输入项目名称" }]}
+      >
         <Input />
       </FormItem>
-      <FormItem label="项目地址" name="projectPath" required validateTrigger="onBlur" rules={[{ required: true, message: "请输入项目地址" }, { validator: validateProjectPath }]}>
+      <FormItem
+        required
+        label="项目地址"
+        name="projectPath"
+        validateTrigger="onBlur"
+        rules={[{ required: true, message: "请输入项目地址" }, { validator: validateProjectPath }]}
+      >
         <Input />
       </FormItem>
-      <FormItem label="编辑器" name="editorExecPath" required rules={[{ required: true, message: "请选择编辑器" }]}>
+      <FormItem
+        required
+        label="编辑器"
+        name="editor"
+        rules={[{ required: true, message: "请选择编辑器" }]}
+      >
         <Select
           options={applications.editors.map(item => ({ label: item.name, value: item.executeName }))}
         />
       </FormItem>
-      <FormItem label="终端工具" name="terminalExecPath" required rules={[{ required: true, message: "请选择终端工具" }]}>
+      <FormItem
+        label="终端工具"
+        name="terminal"
+        required
+        rules={[{ required: true, message: "请选择终端工具" }]}
+      >
         <Select
           options={applications.terminals.map(item => ({ label: item.name, value: item.executeName }))}
         />
+      </FormItem>
+      <FormItem
+        label="启动命令配置"
+        name="startCommand"
+      >
+        <Input.TextArea placeholder="eg: pnpm build
+      pnpm start" />
       </FormItem>
     </Modal>
   )

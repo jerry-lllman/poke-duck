@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
@@ -44,12 +44,23 @@ function App() {
 
   const addProject = async (values: IProjectInfo) => {
     const projectInfo = {
-      ...values,
-      id: nanoid()
+      id: nanoid(), // 这个 id 生成可以挪到后端生成
+      ...values
     }
     await invoke('add_project', { projectInfo })
-    setVisible(false)
+    onCancel()
     getProjectData()
+  }
+
+  const updateProject = async (values: IProjectInfo) => {
+    await invoke('update_project', { projectInfo: { ...values, id: currentProjectId } })
+    onCancel()
+    getProjectData()
+  }
+
+  const onCancel = () => {
+    setCurrentProjectId(undefined)
+    setVisible(false)
   }
 
   const clearData = async () => {
@@ -57,16 +68,32 @@ function App() {
     getProjectData()
   }
 
+  const [currentProjectId, setCurrentProjectId] = useState<string>()
+  const editProject = (id: string) => {
+    setCurrentProjectId(id)
+    setVisible(true)
+  }
+
+  const currentProject = useMemo(() => {
+    return projectData.data.find(item => item.id === currentProjectId)
+  }, [currentProjectId, projectData.data])
+
   return (
     <div>
       <Flex className="mb-5" justify="flex-end">
         <Button onClick={openAddProjectModal}>添加项目</Button>
         <Button onClick={clearData} >清除数据</Button>
       </Flex>
-      <ProjectInfo open={visible} onOk={addProject} onCancel={() => setVisible(false)} />
+      <ProjectInfo
+        initialValues={currentProject}
+        open={visible}
+        onOk={currentProjectId ? updateProject : addProject}
+        onCancel={onCancel}
+      />
       <ProjectList
         dataSource={projectData.data}
         getDataSource={getProjectData}
+        editProject={editProject}
       />
     </div>
   );

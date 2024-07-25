@@ -1,6 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use std::process::Command;
+use std::{process::Command, thread, time};
 
 use serde::{Deserialize, Serialize};
 use user_applications::{get_applications_by_names, Application};
@@ -14,13 +14,49 @@ fn validate_project_path(project_path: &str) -> anyhow_tauri::TAResult<bool> {
 }
 
 #[tauri::command]
-fn run_command(command: &str, args: Vec<String>) -> anyhow_tauri::TAResult<()> {
+fn run_command(command: &str, args: Vec<String>) -> anyhow_tauri::TAResult<u32> {
     let mut cmd = Command::new("open");
     cmd.arg("-a");
     cmd.arg(command);
     cmd.args(args);
+
     println!("{:?}", cmd);
-    let _ = cmd.spawn();
+    let child = cmd.spawn().expect("Failed to execute command"); // TODO: handle error
+    let pid = child.id();
+    Ok(pid)
+}
+
+#[tauri::command]
+fn open_terminal_by_project_id(id: &str) -> anyhow_tauri::TAResult<()> {
+    let projects = read_projects()?;
+    let project = projects.iter().find(|project| project.id == id);
+    if let Some(project) = project {
+        // 打开终端
+        let _pid = run_command(&project.terminal, vec![project.project_path.clone()])?;
+        // 执行 apple script
+        if !project.start_command.is_empty() {
+            let apple_script = format!(
+                r#"
+                tell application "{}"
+                    delay 1
+                    tell application "System Events"
+                        keystroke "{}"
+                        key code 36 -- Enter key
+                    end tell
+                end tell
+            "#,
+                project.terminal, project.start_command
+            );
+
+            let output = Command::new("osascript")
+                .arg("-e")
+                .arg(apple_script)
+                .output()
+                .expect("Failed to execute AppleScript"); // TODO: handle error
+
+            println!("Output: {:?}", output);
+        }
+    }
     Ok(())
 }
 
@@ -48,10 +84,12 @@ struct ProjectInfo {
     project_name: String,
     #[serde(rename = "projectPath")]
     project_path: String,
-    #[serde(rename = "editorExecPath")]
-    editor_exec_path: String,
-    #[serde(rename = "terminalExecPath")]
-    terminal_exec_path: String,
+    // #[serde(rename = "editor")]
+    editor: String,
+    // #[serde(rename = "terminal")]
+    terminal: String,
+    #[serde(rename = "startCommand")]
+    start_command: String,
 }
 
 const DEFAULT_HOME_DIR: &str = "/Users";
@@ -105,6 +143,20 @@ async fn add_project(project_info: ProjectInfo) -> anyhow_tauri::TAResult<()> {
     Ok(())
 }
 
+#[tauri::command]
+async fn update_project(project_info: ProjectInfo) -> anyhow_tauri::TAResult<()> {
+    let mut projects = read_projects()?;
+    let index = projects
+        .iter()
+        .position(|project| project.id == project_info.id);
+    if let Some(index) = index {
+        projects[index] = project_info;
+        write_projects(projects)?;
+    }
+    Ok(())
+    // TODO: handle error
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct ProjectData {
     data: Vec<ProjectInfo>,
@@ -151,9 +203,11 @@ fn main() {
             get_terminal_applications,
             get_editor_applications,
             add_project,
+            update_project,
             get_projects,
             remove_projects,
             clear_data,
+            open_terminal_by_project_id,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
